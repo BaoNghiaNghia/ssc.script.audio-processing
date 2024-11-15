@@ -24,7 +24,7 @@ def separate_vocals(audio_file):
         separated_audio_path = os.path.join(os.getcwd(), 'separated', 'htdemucs', file_name_without_extension, 'vocals.wav')
         
         return separated_audio_path
-        
+
     except subprocess.CalledProcessError as e:
         print("An error occurred while running Demucs:")
         print(e.stderr)
@@ -57,8 +57,6 @@ def transcribe_audio(audio_file):
             except sr.RequestError as e:
                 print(f"API error for chunk {i // chunk_length}: {e}")
                 transcripts.append("")
-
-        # Clean up temporary chunk file
         os.remove(chunk_file)
 
     return transcripts
@@ -71,9 +69,7 @@ def create_srt(transcripts, output_srt):
     for idx, text in enumerate(transcripts):
         if text.strip():  # Only create entries for non-empty texts
             end_time = start_time + 60  # End time (next 60 seconds)
-            start_time_code = start_time // 60
-            end_time_code = end_time // 60
-            
+
             subtitle = srt.Subtitle(index=idx + 1,
                                     start=srt.timedelta(seconds=start_time),
                                     end=srt.timedelta(seconds=end_time),

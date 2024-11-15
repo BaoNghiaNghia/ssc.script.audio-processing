@@ -40,7 +40,7 @@ def process_vocals(vocal_audio_file):
     rms = librosa.feature.rms(y=audio)[0]
 
     # Step 2: Smooth the RMS values using the Savitzky-Golay filter
-    smoothed_rms = savgol_filter(rms, window_length=70, polyorder=4)  # Adjust window_length for smoothing
+    smoothed_rms = savgol_filter(rms, window_length=15, polyorder=4)  # Adjust window_length for smoothing
 
     # Step 3: Find peaks and troughs in the smoothed RMS signal
     smoothed_peaks, _ = find_peaks(smoothed_rms, height=0.1)
