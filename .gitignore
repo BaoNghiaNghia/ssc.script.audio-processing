@@ -1,5 +1,7 @@
 venv/
-venv
+separated/
+
 
 *.srt
 *.mp3
+*.wav

@@ -1,8 +1,10 @@
 import subprocess
+import numpy as np
+import librosa
+import librosa.display
+import matplotlib.pyplot as plt
+from scipy.signal import savgol_filter, find_peaks
 import argparse
-import speech_recognition as sr
-from pydub import AudioSegment
-import srt
 import os
 
 def separate_vocals(audio_file):
@@ -30,78 +32,44 @@ def separate_vocals(audio_file):
         print(e.stderr)
         return None
 
-def transcribe_audio(audio_file):
-    # Initialize recognizer
-    recognizer = sr.Recognizer()
-    transcripts = []
+def process_vocals(vocal_audio_file):
+    # Load the audio file using librosa
+    audio, sr = librosa.load(vocal_audio_file, sr=None)
     
-    # Load audio file
-    audio = AudioSegment.from_wav(audio_file)  # Demucs outputs .wav files
+    # Compute the RMS energy of the audio signal
+    rms = librosa.feature.rms(y=audio)[0]
 
-    # Split audio into smaller chunks for recognition
-    chunk_length = 60 * 1000  # 60 seconds per chunk
-    for i in range(0, len(audio), chunk_length):
-        chunk = audio[i:i+chunk_length]
-        chunk_file = f"chunk_{i // chunk_length}.wav"
-        chunk.export(chunk_file, format="wav")
-        
-        with sr.AudioFile(chunk_file) as source:
-            audio_data = recognizer.record(source)
-            try:
-                text = recognizer.recognize_google(audio_data)
-                print(f"Transcribed text for chunk {i // chunk_length}: {text}")
-                transcripts.append(text)
-            except sr.UnknownValueError:
-                print(f"No recognizable speech in chunk {i // chunk_length}")
-                transcripts.append("")  # No speech detected
-            except sr.RequestError as e:
-                print(f"API error for chunk {i // chunk_length}: {e}")
-                transcripts.append("")
+    # Step 2: Smooth the RMS values using the Savitzky-Golay filter
+    smoothed_rms = savgol_filter(rms, window_length=70, polyorder=4)  # Adjust window_length for smoothing
 
-        # Clean up temporary chunk file
-        os.remove(chunk_file)
+    # Step 3: Find peaks and troughs in the smoothed RMS signal
+    smoothed_peaks, _ = find_peaks(smoothed_rms, height=0.1)
+    smoothed_troughs, _ = find_peaks(-smoothed_rms, height=0.1)
 
-    return transcripts
+    # Convert frame indices to time in seconds
+    times = librosa.frames_to_time(np.arange(len(smoothed_rms)), sr=sr)
 
-def create_srt(transcripts, output_srt):
-    # Assuming each transcript corresponds to 60 seconds
-    start_time = 0  # Start time in seconds
-    srt_items = []
+    # Plot only smoothed peaks and troughs
+    plt.figure(figsize=(10, 6))
+    plt.plot(times, smoothed_rms, label='Smoothed RMS', linestyle='--')
+    plt.plot(times[smoothed_peaks], smoothed_rms[smoothed_peaks], 'r^', label='Smoothed Peaks')
+    plt.plot(times[smoothed_troughs], smoothed_rms[smoothed_troughs], 'bv', label='Smoothed Troughs')
+    
+    plt.title("Smoothed RMS Energy with Peaks and Troughs")
+    plt.xlabel("Time (seconds)")
+    plt.ylabel("Smoothed RMS energy")
+    plt.legend()
+    plt.show()
 
-    for idx, text in enumerate(transcripts):
-        if text.strip():  # Only create entries for non-empty texts
-            end_time = start_time + 60  # End time (next 60 seconds)
-            start_time_code = start_time // 60
-            end_time_code = end_time // 60
-            
-            subtitle = srt.Subtitle(index=idx + 1,
-                                    start=srt.timedelta(seconds=start_time),
-                                    end=srt.timedelta(seconds=end_time),
-                                    content=text)
-            srt_items.append(subtitle)
-            start_time = end_time
-
-    # Write to output SRT file
-    with open(output_srt, 'w') as f:
-        f.write(srt.compose(srt_items))
-
-    if srt_items:
-        print(f"SRT file created successfully with {len(srt_items)} entries.")
-    else:
-        print("SRT file was created but is empty due to no transcriptions.")
+    return smoothed_rms, smoothed_peaks, smoothed_troughs, times
 
 def main():
     # Set up argument parser
-    parser = argparse.ArgumentParser(description="Separate vocals from audio and create synchronized SRT file.")
+    parser = argparse.ArgumentParser(description="Separate vocals from audio, process and visualize RMS peaks/troughs.")
     parser.add_argument(
         'audio_file', 
         type=str, 
         help="Path to the input audio file."
-    )
-    parser.add_argument(
-        'output_srt', 
-        type=str, 
-        help="Path for the output SRT file."
     )
     
     # Parse arguments
@@ -113,16 +81,16 @@ def main():
     if separated_audio_file:
         print(f"Separated vocals saved at: {separated_audio_file}")
         
-        # Step 2: Transcribe the separated vocals
-        transcripts = transcribe_audio(separated_audio_file)
+        # Step 2: Process vocals and visualize only smoothed peaks/troughs
+        smoothed_rms, smoothed_peaks, smoothed_troughs, times = process_vocals(separated_audio_file)
         
-        # Step 3: Create SRT file if there are valid transcripts
-        if any(transcripts):  # Only proceed if there are valid non-empty transcriptions
-            create_srt(transcripts, args.output_srt)
-        else:
-            print("No valid transcriptions were generated. Check audio quality or transcription service.")
+        # Output the results
+        print("Smoothed RMS:", smoothed_rms)
+        print("Smoothed Peaks:", smoothed_peaks)
+        print("Smoothed Troughs:", smoothed_troughs)
+        print("Times (seconds):", times)
     else:
-        print("Error in separating vocals. SRT file not created.")
+        print("Error in separating vocals.")
 
 if __name__ == "__main__":
     main()
