@@ -14,15 +14,15 @@ def separate_vocals(audio_file):
             text=True,
             capture_output=True
         )
-        
+
         print("Output:\n", result.stdout)
         print("Errors (if any):\n", result.stderr)
-        
+
         # Construct path to the separated vocals file
         base_name = os.path.basename(audio_file)
         file_name_without_extension = os.path.splitext(base_name)[0]
         separated_audio_path = os.path.join(os.getcwd(), 'separated', 'htdemucs', file_name_without_extension, 'vocals.wav')
-        
+
         return separated_audio_path
 
     except subprocess.CalledProcessError as e:
@@ -34,7 +34,7 @@ def transcribe_audio(audio_file):
     # Initialize recognizer
     recognizer = sr.Recognizer()
     transcripts = []
-    
+
     # Load audio file
     audio = AudioSegment.from_wav(audio_file)  # Demucs outputs .wav files
 
@@ -94,18 +94,19 @@ def main():
         type=str, 
         help="Path to the input audio file."
     )
+
     parser.add_argument(
         'output_srt', 
         type=str, 
         help="Path for the output SRT file."
     )
-    
+
     # Parse arguments
     args = parser.parse_args()
     
     # Step 1: Separate vocals
     separated_audio_file = separate_vocals(args.audio_file)
-    
+
     if separated_audio_file:
         print(f"Separated vocals saved at: {separated_audio_file}")
         

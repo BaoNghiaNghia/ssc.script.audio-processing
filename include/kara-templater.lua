@@ -1,4 +1,4 @@
-local karaskel = require("karaskel.lua")
+include("karaskel.lua")
 
 function log_console(level, message, ...)
     local levels = {
@@ -892,6 +892,3 @@ function read_ass_file(filename)
     file:close()
     return subs
 end
-
-
-read_ass_file(filename)
